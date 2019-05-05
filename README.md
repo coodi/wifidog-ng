@@ -6,73 +6,44 @@
 [4]: https://github.com/zhaojh329/wifidog-ng/pulls
 [5]: https://img.shields.io/badge/Issues-welcome-brightgreen.svg?style=plastic
 [6]: https://github.com/zhaojh329/wifidog-ng/issues/new
-[7]: https://img.shields.io/badge/release-1.5.6-blue.svg?style=plastic
+[7]: https://img.shields.io/badge/release-2.0.0-blue.svg?style=plastic
 [8]: https://github.com/zhaojh329/wifidog-ng/releases
-[9]: https://travis-ci.org/zhaojh329/wifidog-ng.svg?branch=master
-[10]: https://travis-ci.org/zhaojh329/wifidog-ng
 
 [![license][1]][2]
 [![PRs Welcome][3]][4]
 [![Issue Welcome][5]][6]
 [![Release Version][7]][8]
-[![Build Status][9]][10]
 
-[libuhttpd]: https://github.com/zhaojh329/libuhttpd
-[libubox]: https://git.openwrt.org/?p=project/libubox.git
-[libuclient]: https://git.openwrt.org/?p=project/uclient.git
-[libuci]: https://git.openwrt.org/?p=project/uci.git
-[WifiDog]: https://github.com/wifidog/wifidog-gateway
-[c-ares]: https://github.com/c-ares/c-ares
-[rtty]: https://github.com/zhaojh329/rtty
-[ipset]: http://ipset.netfilter.org
-[libpcap]: http://www.us.tcpdump.org
-
-Next generation [WifiDog]
+Next generation WifiDog
 
 WifiDog-ng is a very efficient captive portal solution for wireless router which with
-embedded linux(LEDE/Openwrt) system. 
+embedded linux(LEDE/Openwrt) system implemented in Lua.
 
 `Keep Watching for More Actions on This Space`
 
 # Features
-* Use epoll - Based on [libubox]: Single threaded, Fully asynchronous, No blocking operation at all
+* Written in Lua, so development is very efficient
 * Use ipset and writing kernel module to implement authentication management instead of using iptables to create firewall rules
-* Support HTTPS: OpenSSL, mbedtls and CyaSSl(wolfssl)
-* Remote configuration(With the help of [rtty])
 * Support roam
 * Code structure is concise and understandable
 
-# Dependencies
-* [libubox]
-* [libuhttpd]
-* [libuclient]
-* [libuci]
-* [c-ares]
-* [ipset]
-* [libpcap]
-
-# Install on OpenWrt
-    opkg update
-    opkg list | grep wifidog-ng
-    opkg install wifidog-ng-nossl
-
-If the install command fails, you can [compile it yourself](/BUILDOPENWRT.md).
+# [Build](/BUILD.md)
 
 # UCI Config options
 ## Section gateway
 | Name           | Type        | Required  | Default | Description |
 | -------------- | ----------- | --------- | ------- | ------- |
 | enabled        | bool        | no        | 0       | Whether to enable wifidog |
+| dhcp_host_white| bool        | no        | 1       | dhcp mac is whitelist |
 | id             | string      | no        |         | Gateway id. If not set, the mac address of the ifname will be used |
-| ifname         | interface   | no        | br-lan  | Interface to listen by wifidog |
+| interface      | Openwrt interface  | no      | lan  | The device belong to the interface to listen by wifidog |
 | port           | port number | no        | 2060    | port to listen by wifidog |
 | ssl_port       | port number | no        | 8443    | ssl port to listen by wifidog |
 | ssid           | ssid        | no        |         | Used for WeChat |
-| checkinterval  | seconds     | no        | 30      | How many seconds should we wait between timeout checks. This is also how often the gateway will ping the auth server and how often it will update the traffic counters on the auth server.|
+| checkinterval  | seconds     | no        | 30      | How often the gateway will ping the auth server |
 | temppass_time  | seconds     | no        | 30      | Temporary pass time |
-| client_timeout | seconds     | no        | 5       | Set this to the desired of number of CheckInterval of inactivity before a client is logged out. The timeout will be INTERVAL * TIMEOUT |
 
-## Section authserver
+## Section server
 | Name        | Type        | Required  | Default         |
 | ----------- | ----------- | --------- | --------------- |
 | host        | string      | yes       | no              |
@@ -85,16 +56,18 @@ If the install command fails, you can [compile it yourself](/BUILDOPENWRT.md).
 | ping_path   | string      | no        | ping            |
 | auth_path   | string      | no        | auth            |
 
-## Section popularserver
-| Name    | Type | Required  | Default                    |
-| ------- | ---- | --------- | -------------------------- |
-| server  | list | no        | `www.baidu.com www.qq.com` |
+## Section validated_user
 
-## Section whitelist
-| Name   | Type | Description               | 
-| ------ | ---- | ------------------------- |
-| domain | list | Can be a domain or ipaddr |
-| mac    | list | A macaddr                 |
+| Name    | Type   | Description         | 
+| ------- | ------ | ------------------- |
+| mac     | string | A macaddr           |
+| comment | string | A comment           |
+
+## Section validated_domain
+| Name    | Type   | Description               | 
+| ------- | ------ | ------------------------- |
+| domain  | string | Can be a domain or ipaddr |
+| comment | string | A comment                 |
 
 # Protocol
 ## Gateway heartbeating (Ping Protocol)
@@ -118,103 +91,25 @@ The response of the auth server should be "Auth: 1" or "Auth: 0"
 
 The response of the auth server should be "token=xxxxxxx" or other.
 
-## Counters (POST)
-`http://authserver/wifidog/auth/?stage=counters&gw_id=xx`
-
-```
-{
-    "counters":[{
-        "ip": "192.168.1.201",
-        "mac": "xx:xx:xx:xx:xx:xx",
-        "token": "eb6d8d7f5ad6f35553a40f66cd2bff70",
-        "incoming": 4916,
-        "outgoing": 20408,
-        "uptime": 23223
-    }, {
-        "ip": "192.168.1.202",
-        "mac": "xx:xx:xx:xx:xx:xx",
-        "token": "eb6d8d7f5ad6f35553a40f66cd2bff70",
-        "incoming": 4916,
-        "outgoing": 20408,
-        "uptime": 23223
-    }]
-}
-```
-
-The response of the server should be:
-
-```
-{
-    "resp":[{
-        "mac": "0c:1d:ff:c4:db:fc",
-        "auth": 1
-    }, {
-        "mac": "0c:1d:cf:c4:db:fc",
-        "auth": 0
-    }]
-}
-```
-
 ## Temporary pass
 `http://gw_address:gw_port/wifidog/temppass?script=startWeChatAuth();`
 
 # [Test Server](https://github.com/zhaojh329/wifidog-ng-authserver)
 
-# Remote configuration(First install [rtty])
-wifidog-ng provides the UBUS configuration interface and then remotely configuring the wifidog-ng with the help of the remote execution command of the [rtty]
+# Manage
+## Kick off the term
 
-    # ubus -v list wifidog-ng
-    'wifidog-ng' @5903037c
-        "term":{"action":"String","mac":"String"}
-        "config":{"type":"String","options":"Table"}
-        "whitelist":{"action":"String","domain":"String","mac":"String"}
+    wget "http://lanip:2060/wifidog/ctl?op=kick&mac=0C:1D:AF:C4:DB:FC" -O /dev/null
 
-## Allow client
+## Relaod config
 
-    ubus call wifidog-ng term '{"action":"add", "mac":"11:22:33:44:55:66"}'
+    wget "http://lanip:2060/wifidog/ctl?op=reload" -O /dev/null
 
-## Kick off client
+## Show device
 
-    ubus call wifidog-ng term '{"action":"del", "mac":"11:22:33:44:55:66"}'
+    ipset list wifidog-ng-mac
 
-## Add domain whitelist
-
-    ubus call wifidog-ng whitelist '{"action":"add", "type":"domain", "value":"qq.com"}'
-
-## Delete domain whitelist
-
-    ubus call wifidog-ng whitelist '{"action":"del", "type":"domain", "value":"qq.com"}'
-
-## Add macaddr whitelist
-
-    ubus call wifidog-ng whitelist '{"action":"add", "type":"mac", "value":"11:22:33:44:55:66"}'
-
-## Delete macaddr whitelist
-
-    ubus call wifidog-ng whitelist '{"action":"del", "type":"mac", "value":"11:22:33:44:55:66"}'
-
-## Show terminal list
-
-    ubus call wifidog-ng term '{"action":"show"}'
-
-## Remote configuration example
-
-    #!/bin/sh
-
-    host="your-rtty-server.com"
-    port=5912
-    devid="test"
-    username="root"
-    password="123456"
-    action="add"
-    domain="www.163.com"
-
-    params="[\"call\", \"wifidog-ng\", \"whitelist\", \"{\\\"action\\\":\\\"$action\\\", \\\"domain\\\":\\\"$domain\\\"}\"]"
-
-    data="{\"devid\":\"$devid\",\"username\":\"$username\",\"password\":\"$password\",\"cmd\":\"ubus\",\"params\":$params}"
-
-    echo $data
-    curl -k "https://$host:$port/cmd" -d "$data"
+# [Donate](https://gitee.com/zhaojh329/wifidog-ng#project-donate-overview)
 
 # Contributing
 If you would like to help making [wifidog-ng](https://github.com/zhaojh329/wifidog-ng) better,
